@@ -101,8 +101,8 @@
             margin-right: 10px;
         }
 
-        #response strong {
-            color: #d9534f;
+        #response strong.interaction {
+            color: #d9534f; /* Red color for highlighting interactions */
         }
 
         #response ul {
@@ -157,7 +157,8 @@
         </div>
     </div>
     <script>
-        // ... (JavaScript code remains the same)
+        const apiKey = 'AIzaSyBcr8Pb38qJKQfUvcy0atRcWGv0KfOVEdc'; // Replace with your actual Gemini API key - Store securely!
+        const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
         let conversationHistory = [];
 
         async function sendMessage() {
@@ -176,29 +177,40 @@
             const messages = [
                 {
                     role: 'system',
-                    content: 'You are an AI Medication Interaction Checker. Your purpose is to warn users about potential drug interactions. You are NOT a substitute for professional medical advice. Always advise users to consult with a doctor or pharmacist. If the user asks a question outside of medication interactions, respond with "I can only check for medication interactions. Please consult a healthcare professional for other medical advice." Remember details from previous turns and do not ask for the same medications again. If you need more information, ask a clarifying question about the medications listed.',
+                    content: `You are an AI Medication Interaction Checker. Your purpose is to thoroughly analyze the provided list of medications and warn users about potential drug interactions in a detailed, long-format explanation. Highlight any potential interactions in red using HTML's <strong> tag with the class "interaction". 
+
+                    You are NOT a substitute for professional medical advice. Always explicitly advise users to consult with a doctor or pharmacist for any health concerns or before making any changes to their medication regimen. 
+
+                    If the user asks a question outside of medication interactions, respond with "I can only check for medication interactions. Please consult a healthcare professional for other medical advice." 
+
+                    Remember details from previous turns and do not ask for the same medications again. If you need more information to assess potential interactions, ask a specific and clarifying question about the medications listed (e.g., dosage, frequency, other existing conditions). Provide a comprehensive analysis of potential interactions, including the possible mechanisms and potential effects.`,
                 },
                 ...conversationHistory.map((message) => ({ role: message.role, content: message.content })),
             ];
 
             try {
-                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                const response = await fetch(endpoint + '?key=' + apiKey, {
                     method: 'POST',
                     headers: {
-                        Authorization: 'Bearer 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',
-                        'HTTP-Referer': 'https://www.sitename.com',
-                        'X-Title': 'AIMedicationChecker',
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ model: 'google/gemini-pro', messages: messages }),
+                    body: JSON.stringify({
+                        contents: messages.map(msg => ({
+                            role: msg.role === 'system' ? 'user' : msg.role, // Gemini expects 'user' or 'model'
+                            parts: [{ text: msg.content }]
+                        })),
+                        generationConfig: {
+                            maxOutputTokens: 500, // Increased maxOutputTokens for longer responses
+                        },
+                    }),
                 });
 
                 const data = await response.json();
                 console.log(data);
 
-                const aiResponse = data.choices?.[0]?.message?.content || 'No response received.';
+                const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received.';
 
-                conversationHistory.push({ role: 'assistant', content: aiResponse });
+                conversationHistory.push({ role: 'model', content: aiResponse }); // Gemini uses 'model' role
 
                 const markdownText = aiResponse;
                 responseDiv.innerHTML = "<h3><i class='fas fa-comment-dots'></i> Interaction Results</h3>" + marked.parse(markdownText);
